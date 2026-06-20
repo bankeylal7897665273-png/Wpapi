@@ -1,9 +1,7 @@
-// --- ADDED THIS TO FIX 'crypto is not defined' ERROR ---
 const crypto = require('crypto');
 if (!global.crypto) {
     global.crypto = crypto.webcrypto;
 }
-// -------------------------------------------------------
 
 const express = require('express');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
@@ -92,7 +90,7 @@ app.get('/status', (req, res) => {
 });
 
 // Main API Route matching your requirement:
-// /api/unekid/+910000000000=sms=rahul
+// /api/unekid/+910000000000=OTP=8483
 app.get('/api/:uniqueid/:payload', async (req, res) => {
     const { uniqueid, payload } = req.params;
 
@@ -100,10 +98,14 @@ app.get('/api/:uniqueid/:payload', async (req, res) => {
         return res.status(403).json({ success: false, error: 'Invalid Unique ID' });
     }
 
-    // Split the payload by '=sms='
-    const parts = payload.split('=sms=');
+    // Split the payload by '=OTP=' (or fallback to '=sms=' just in case)
+    let parts = payload.split('=OTP=');
     if (parts.length !== 2) {
-        return res.status(400).json({ success: false, error: 'Invalid format. Use number=sms=message' });
+        parts = payload.split('=sms=');
+    }
+    
+    if (parts.length !== 2) {
+        return res.status(400).json({ success: false, error: 'Invalid format. Use number=OTP=message' });
     }
 
     const targetNumber = parts[0].replace(/[^0-9]/g, '');

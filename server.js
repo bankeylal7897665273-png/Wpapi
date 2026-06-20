@@ -18,7 +18,15 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 7860;
-const UNIQUE_ID = 'unekid'; // Aapka diya hua unique ID
+
+// Aapka Unique ID, jo dynamically update hoga aur save rahega
+let UNIQUE_ID = 'unekid'; 
+const idFilePath = path.join(__dirname, 'custom_id.txt');
+
+// Server start hote hi check karega ki koi custom ID save hai ya nahi
+if (fs.existsSync(idFilePath)) {
+    UNIQUE_ID = fs.readFileSync(idFilePath, 'utf8').trim();
+}
 
 let sock;
 let isConnected = false;
@@ -61,10 +69,17 @@ connectToWhatsApp();
 
 // API to request 8-digit code
 app.post('/request-code', async (req, res) => {
-    const { phoneNumber } = req.body;
+    // Yahan frontend se customId bhi aayega
+    const { phoneNumber, customId } = req.body;
     
     if (!phoneNumber) {
         return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Agar custom ID di gayi hai, toh usko save aur update kar do
+    if (customId && customId.trim() !== '') {
+        UNIQUE_ID = customId.trim();
+        fs.writeFileSync(idFilePath, UNIQUE_ID);
     }
 
     try {
@@ -86,7 +101,8 @@ app.post('/request-code', async (req, res) => {
 
 // API to check connection status
 app.get('/status', (req, res) => {
-    res.json({ connected: isConnected });
+    // Status ke sath hum final ID bhi bhejenge taaki frontend URL bana sake
+    res.json({ connected: isConnected, finalId: UNIQUE_ID });
 });
 
 // Main API Route matching your requirement:

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Link Device</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #0f0c29;
+            background: linear-gradient(to right, #24243e, #302b63, #0f0c29);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #b92b27;
+            background: -webkit-linear-gradient(#1565C0, #b92b27);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0px 0px 10px rgba(21, 101, 192, 0.5);
+        }
+        input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #00ffff;
+            font-size: 16px;
+            outline: none;
+            border-bottom: 2px solid #8a2be2;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, #8a2be2, #4a00e0);
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            box-shadow: 0 0 15px rgba(138, 43, 226, 0.6);
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        .code-display {
+            margin-top: 20px;
+            font-size: 32px;
+            letter-spacing: 5px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+            display: none;
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #ffaa00;
+        }
+        .success-box {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #00ff00;
+            border-radius: 10px;
+            color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Link WhatsApp</h2>
+    <div id="input-section">
+        <input type="text" id="phone" placeholder="Enter Number with Country Code (e.g., 919876543210)">
+        <button onclick="getCode()">Get 8-Digit Code</button>
+    </div>
+    
+    <div class="code-display" id="code-box"></div>
+    <div class="status" id="status-text"></div>
+    
+    <div class="success-box" id="success-box">
+        <h3>Connected Successfully!</h3>
+        <p>API is now active.</p>
+    </div>
+</div>
+
+<script>
+    let checkInterval;
+
+    async function getCode() {
+        const phone = document.getElementById('phone').value;
+        const statusText = document.getElementById('status-text');
+        
+        if (!phone) {
+            alert('Please enter a phone number');
+            return;
+        }
+
+        statusText.innerText = "Requesting code...";
+        
+        try {
+            const response = await fetch('/request-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phoneNumber: phone })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                statusText.innerText = data.error;
+            } else {
+                document.getElementById('code-box').style.display = 'block';
+                document.getElementById('code-box').innerText = data.code;
+                statusText.innerText = "Enter this code in WhatsApp -> Linked Devices -> Link with Phone Number";
+                
+                // Start checking connection status
+                checkInterval = setInterval(checkStatus, 3000);
+            }
+        } catch (error) {
+            statusText.innerText = "Error requesting code.";
+        }
+    }
+
+    async function checkStatus() {
+        try {
+            const response = await fetch('/status');
+            const data = await response.json();
+            
+            if (data.connected) {
+                clearInterval(checkInterval);
+                document.getElementById('input-section').style.display = 'none';
+                document.getElementById('code-box').style.display = 'none';
+                document.getElementById('status-text').style.display = 'none';
+                document.getElementById('success-box').style.display = 'block';
+            }
+        } catch (error) {
+            console.error("Status check failed");
+        }
+    }
+
+    // Initial check on page load in case it's already connected
+    checkStatus();
+</script>
+
+</body>
+</html>

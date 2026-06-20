@@ -11,8 +11,8 @@ RUN npm install
 
 COPY . .
 
-# Hugging Face Spaces default port
-EXPOSE 7860
+# Back4App container default port
+EXPOSE 8080
+ENV PORT=8080
 
 CMD ["npm", "start"]
-

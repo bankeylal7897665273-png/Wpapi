@@ -39,10 +39,19 @@
             -webkit-text-fill-color: transparent;
             text-shadow: 0px 0px 10px rgba(0, 255, 255, 0.5);
         }
+        .input-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            color: #00ffff;
+            font-size: 14px;
+            margin-bottom: 8px;
+            display: block;
+        }
         input {
             width: 100%;
             padding: 15px;
-            margin-bottom: 20px;
             border: none;
             border-radius: 10px;
             background: rgba(0, 0, 0, 0.3);
@@ -50,6 +59,9 @@
             font-size: 16px;
             outline: none;
             border-bottom: 2px solid #8a2be2;
+        }
+        input::placeholder {
+            color: rgba(0, 255, 255, 0.5);
         }
         button {
             width: 100%;
@@ -130,8 +142,18 @@
 
 <div class="container">
     <h2>Link Device (VIP API)</h2>
+    
     <div id="input-section">
-        <input type="text" id="phone" placeholder="Enter Number (e.g., 919876543210)">
+        <div class="input-group">
+            <label>WhatsApp Number (With Country Code)</label>
+            <input type="text" id="phone" placeholder="e.g., 919876543210">
+        </div>
+        
+        <div class="input-group">
+            <label>Set Your Unique Setup ID</label>
+            <input type="text" id="custom-id" placeholder="e.g., b2k, rahul, unekid">
+        </div>
+        
         <button onclick="getCode()">Get 8-Digit Code</button>
     </div>
     
@@ -152,6 +174,8 @@
 
     async function getCode() {
         const phone = document.getElementById('phone').value;
+        const customId = document.getElementById('custom-id').value || 'unekid'; // Default agar khali choda ho
+        
         const statusText = document.getElementById('status-text');
         const spinner = document.getElementById('loading-spinner');
         
@@ -167,7 +191,7 @@
             const response = await fetch('/request-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phoneNumber: phone })
+                body: JSON.stringify({ phoneNumber: phone, customId: customId })
             });
             
             const data = await response.json();
@@ -176,6 +200,7 @@
                 statusText.innerText = data.error;
                 spinner.style.display = 'none';
             } else {
+                document.getElementById('input-section').style.display = 'none';
                 document.getElementById('code-box').style.display = 'block';
                 document.getElementById('code-box').innerText = data.code;
                 
@@ -209,9 +234,10 @@
                 // Show success box
                 document.getElementById('success-box').style.display = 'block';
                 
-                // Generate dynamic API URL based on current host
+                // Generate dynamic API URL based on current host aur final ID jo server ne save ki hai
                 const currentHost = window.location.origin;
-                const exampleUrl = `${currentHost}/api/unekid/+910000000000=OTP=8483`;
+                const finalId = data.finalId || 'unekid';
+                const exampleUrl = `${currentHost}/api/${finalId}/+910000000000=OTP=8483`;
                 
                 document.getElementById('api-link').innerText = exampleUrl;
             }

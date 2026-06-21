@@ -17,7 +17,8 @@ app.use(express.json());
 // Serving the HTML file from the 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-const PORT = process.env.PORT || 7860;
+// Render.com automatically assigns a PORT
+const PORT = process.env.PORT || 8080;
 
 // Aapka Unique ID, jo dynamically update hoga aur save rahega
 let UNIQUE_ID = 'unekid'; 
@@ -37,7 +38,7 @@ async function connectToWhatsApp() {
     sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        logger: pino({ level: 'silent' }), // Silent to avoid Hugging Face log spam
+        logger: pino({ level: 'silent' }), // Silent to avoid log spam
         browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
@@ -53,9 +54,10 @@ async function connectToWhatsApp() {
             if (shouldReconnect) {
                 connectToWhatsApp();
             } else {
-                console.log('Logged out from WhatsApp. Please link again.');
-                // Delete auth folder if logged out so it can restart fresh
-                fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
+                console.log('Logged out from WhatsApp.');
+                if (fs.existsSync('./auth_info_baileys')) {
+                    fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
+                }
             }
         } else if (connection === 'open') {
             isConnected = true;
@@ -67,41 +69,63 @@ async function connectToWhatsApp() {
 // Start connection on boot
 connectToWhatsApp();
 
+// Naya API: Purane Session ko Reset karne ke liye
+app.post('/reset', async (req, res) => {
+    try {
+        isConnected = false;
+        if (sock) {
+            sock.ev.removeAllListeners();
+            try { await sock.logout(); } catch (e) {}
+        }
+        // Force delete the old session folder
+        if (fs.existsSync('./auth_info_baileys')) {
+            fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
+        }
+        // Start fresh
+        connectToWhatsApp();
+        res.json({ success: true, message: 'Server Memory Cleared. You can request a new code now.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // API to request 8-digit code
 app.post('/request-code', async (req, res) => {
-    // Yahan frontend se customId bhi aayega
     const { phoneNumber, customId } = req.body;
     
     if (!phoneNumber) {
         return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    // Agar custom ID di gayi hai, toh usko save aur update kar do
     if (customId && customId.trim() !== '') {
         UNIQUE_ID = customId.trim();
         fs.writeFileSync(idFilePath, UNIQUE_ID);
     }
 
     try {
-        if (!sock.authState.creds.me) {
-            // Remove '+' and spaces
-            const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
-            // Requesting pairing code
-            const code = await sock.requestPairingCode(cleanNumber);
-            // Format code as XXXX-XXXX for readability
-            const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
-            res.json({ code: formattedCode });
-        } else {
-            res.json({ error: 'Device is already connected' });
+        // Checking if already connected
+        if (sock && sock.authState && sock.authState.creds && sock.authState.creds.me) {
+             return res.json({ error: 'Device is already connected! Please click "Reset Server" below to clear old data.' });
         }
+
+        // Clean number (removes + and spaces automatically)
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
+        // Wait briefly to ensure socket is ready
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Requesting pairing code
+        const code = await sock.requestPairingCode(cleanNumber);
+        const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+        res.json({ code: formattedCode });
+        
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'System processing... Click Get Code again in 5 seconds. (' + err.message + ')' });
     }
 });
 
 // API to check connection status
 app.get('/status', (req, res) => {
-    // Status ke sath hum final ID bhi bhejenge taaki frontend URL bana sake
     res.json({ connected: isConnected, finalId: UNIQUE_ID });
 });
 
@@ -114,7 +138,6 @@ app.get('/api/:uniqueid/:payload', async (req, res) => {
         return res.status(403).json({ success: false, error: 'Invalid Unique ID' });
     }
 
-    // Split the payload by '=OTP=' (or fallback to '=sms=' just in case)
     let parts = payload.split('=OTP=');
     if (parts.length !== 2) {
         parts = payload.split('=sms=');
@@ -132,7 +155,6 @@ app.get('/api/:uniqueid/:payload', async (req, res) => {
     }
 
     try {
-        // WhatsApp format for direct messages: number@s.whatsapp.net
         const jid = targetNumber + '@s.whatsapp.net';
         await sock.sendMessage(jid, { text: messageText });
         
